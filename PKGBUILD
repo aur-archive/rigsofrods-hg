@@ -1,0 +1,92 @@
+# Maintainer:  Alfredo Palhares <masterkorp@masterkorp.net>
+
+pkgname=rigsofrods-hg
+pkgver=121
+pkgrel=5
+pkgdesc="An open source vehicle simulator based on soft-body physics"
+arch=('i686' 'x86_64')
+url="http://www.rigsofrods.com"
+license=('GPL')
+depends=('angelscript-2.22.1' 'caelum' 'mygui' 'socketw' 'ogre' 'openal' 'ogre-pagedgeometry' 'wxgtk2.9')
+makedepends=('cmake' 'mercurial' 'zip' 'angelscript-2.22.1')
+conflicts=('rigsofrods')
+provides=('rigsofrods')
+backup=('opt/rigsofrods/bin/plugins.cfg')
+install="rigsofrods-hg.install"
+source=('plugins.cfg'
+        'RoR.desktop'
+        'RoRConfig.desktop'
+        'RoR.png'
+        "rigsofrods-hg.install")
+md5sums=('4a17e366ecfdb6f43ab448a45863a760'
+         '4cc4c5aba1b43ca26f6d8cca69c97f79'
+         'b4763676cfc156c854aeaa3481772291'
+         'b1b8a67e7402f1fbbcf14dbf03303415'
+         'dd16cfb4381e13e7270fbf4fc943afda')
+
+
+_hgroot="http://hg.code.sf.net/p/rigsofrods"
+_hgrepo="codehg"
+
+build() {
+  cd "$srcdir"
+  msg "Connecting to Mercurial server...."
+
+  if [[ -d "$_hgrepo" ]]; then
+    cd "$_hgrepo"
+    hg pull -u
+    msg "The local files are updated."
+  else
+    hg clone "$_hgroot" "$_hgrepo"
+  fi
+
+  msg "Mercurial checkout done or server timeout"
+  msg "Starting build..."
+
+  rm -rf "$srcdir/$_hgrepo-build"
+  cp -r "$srcdir/$_hgrepo" "$srcdir/$_hgrepo-build"
+  cd "$srcdir/$_hgrepo-build"
+
+ LDFLAGS="-lboost_system" cmake . \
+  -DROR_USE_MYGUI=TRUE \
+  -DROR_USE_OPENAL=TRUE \
+  -DROR_USE_SOCKETW=TRUE \
+  -DROR_USE_PAGED=TRUE \
+  -DROR_USE_CAELUM=TRUE \
+  -DROR_USE_ANGELSCRIPT=TRUE \
+  -DANGELSCRIPT_INCLUDE_DIRS=/usr/include \
+  -DANGELSCRIPT_LIBRARIES=/usr/lib/libangelscript.so \
+  -DROR_USE_CURL=TRUE \
+  -DwxWidgets_wxrc_EXECUTABLE=/usr/bin/wxrc-2.9 \
+  -DwxWidgets_CONFIG_EXECUTABLE=/usr/bin/wx-config-2.9 \
+  -DSOCKETW_INCLUDE_DIRS=/usr/include \
+  -DSOCKETW_LIBRARIES=/usr/lib/libSocketW.so \
+  -DCMAKE_PREFIX_PATH=/opt/rigsofrods
+
+ make
+}
+
+package() {
+ cd "$srcdir/$_hgrepo-build"
+ mkdir -p $pkgdir/opt/rigsofrods
+ cp -dpr --no-preserve=ownership bin "$pkgdir/opt/rigsofrods"
+
+ # Somtimes RoR does not like directories
+ for dir in "$pkgdir/opt/rigsofrods/bin/resources/"*; do
+   if [[ -d $dir ]]; then
+     cd "$dir"
+     zip "$dir.zip" *
+     cd ..
+     rm -r $dir
+   fi
+ done
+
+ install -Dm 644 "$srcdir/plugins.cfg" "$pkgdir/opt/rigsofrods/bin/plugins.cfg"
+ install -Dm 644 "$srcdir/RoR.png" "$pkgdir/usr/share/pixmaps/RoR.png"
+ install -Dm 644 "$srcdir/RoR.desktop" "$pkgdir/usr/share/applications/RoR.desktop"
+ install -Dm 644 "$srcdir/RoRConfig.desktop" "$pkgdir/usr/share/applications/RoRConfig.desktop"
+
+ mkdir -p "$pkgdir/usr/bin"
+ ln -s "/opt/rigsofrods/bin/RoRConfig" "$pkgdir/usr/bin/RoRConfig"
+ ln -s "/opt/rigsofrods/bin/RoR" "$pkgdir/usr/bin/RoR"
+}
